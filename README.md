@@ -2,6 +2,8 @@
 
 An interactive 3D visualization of London built with WebGL. Explore the city's architecture with smooth pan, rotate, and zoom controls — plus real-time data layers for property prices, crime stats, and air quality.
 
+🚀 **Live Demo**: [https://fxxii.github.io/3d-map/](https://fxxii.github.io/3d-map/)
+
 ![3D Map Preview](./preview.png)
 
 ## ✨ Features
