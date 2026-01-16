@@ -10,7 +10,41 @@ const LONDON_LAT = 51.5076;
 const LONDON_LON = -0.1279;
 
 // ============================================
-// MAP INITIALIZATION
+// GLOBAL STATE
+let activePopup = null;
+let activeLoaders = new Set();
+
+const LOADER_LABELS = {
+  'crime': '🚨 Crime',
+  'air': '🌫️ Air Quality',
+  'transport': '🚇 Transport'
+};
+
+function updateToastText() {
+  const toast = document.getElementById('loading-toast');
+  if (!toast) return;
+
+  if (activeLoaders.size === 0) {
+    toast.classList.add('hidden');
+  } else {
+    const labels = Array.from(activeLoaders).map(id => LOADER_LABELS[id] || id);
+    toast.textContent = `Loading ${labels.join(', ')}...`;
+    toast.classList.remove('hidden');
+  }
+}
+
+function showToast(id) {
+  activeLoaders.add(id);
+  updateToastText();
+}
+
+function hideToast(id) {
+  activeLoaders.delete(id);
+  updateToastText();
+}
+
+// ============================================
+// 1. MAP INITIALIZATION
 // ============================================
 const map = new maplibregl.Map({
   container: 'map',
@@ -41,6 +75,7 @@ map.on('load', () => {
   initPropertyViewer();
   initCrimeHeatmap();
   initAirQuality();
+  initTransport();
   
   setTimeout(() => {
     document.getElementById('loading').classList.add('hidden');
@@ -96,39 +131,66 @@ function add3DBuildings() {
 }
 
 // ============================================
-// 1. SUNLIGHT ANALYZER
+// 3. SUNLIGHT ANALYZER (SunCalc)
 // ============================================
 function initSunlightAnalyzer() {
   const slider = document.getElementById('time-slider');
   const timeDisplay = document.getElementById('time-display');
-  
-  if (!slider) return;
-  
+  const realtimeToggle = document.getElementById('toggle-realtime');
+
+  if (!slider || !timeDisplay || !realtimeToggle) return;
+
+  let updateInterval = null;
+
+  // Helper: Sync to Real Time
+  const syncToNow = () => {
+    const now = new Date();
+    const currentHour = now.getHours() + (now.getMinutes() / 60);
+    // Clamp between slider bounds (5 and 21)
+    const clampedHour = Math.max(5, Math.min(21, currentHour));
+
+    slider.value = clampedHour;
+    updateSunPosition(clampedHour);
+
+    const hours = Math.floor(clampedHour);
+    const mins = Math.floor((clampedHour % 1) * 60);
+    timeDisplay.textContent = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+  };
+
+  // 1. Toggle "Now" Mode
+  realtimeToggle.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      syncToNow();
+      updateInterval = setInterval(syncToNow, 60000); // Update every minute
+    } else {
+      if (updateInterval) clearInterval(updateInterval);
+      updateInterval = null;
+    }
+  });
+
+  // 2. Slider Interaction
   slider.addEventListener('input', (e) => {
+    // If user moves slider, disable standard "Now" mode
+    if (realtimeToggle.checked) {
+      realtimeToggle.checked = false;
+      if (updateInterval) clearInterval(updateInterval);
+      updateInterval = null;
+    }
+
     const hour = parseFloat(e.target.value);
     updateSunPosition(hour);
-    
+
     const hours = Math.floor(hour);
     const mins = Math.floor((hour % 1) * 60);
     timeDisplay.textContent = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
   });
-  
-  // Set initial position based on current time
-  const now = new Date();
-  const currentHour = now.getHours() + (now.getMinutes() / 60);
-  
-  // Clamp between slider bounds (5 and 21)
-  const clampedHour = Math.max(5, Math.min(21, currentHour));
-  
-  slider.value = clampedHour;
-  updateSunPosition(clampedHour);
-  
-  // Update display text immediately
-  const hours = Math.floor(clampedHour);
-  const mins = Math.floor((clampedHour % 1) * 60);
-  timeDisplay.textContent = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
 
-  console.log(`☀️ Sunlight analyzer initialized at ${timeDisplay.textContent}`);
+  // Initial Load: Default to "Now"
+  syncToNow();
+  realtimeToggle.checked = true;
+  updateInterval = setInterval(syncToNow, 60000);
+
+  console.log(`☀️ Sunlight analyzer initialized (Realtime Mode: ON)`);
 }
 
 function updateSunPosition(hour) {
@@ -153,6 +215,18 @@ function updateSunPosition(hour) {
     intensity: intensity,
     position: [1.5, azimuth, 90 - altitude]
   });
+
+  // Update Water Color (Dynamic)
+  if (map.getLayer('water')) {
+    const isNight = hour < 6 || hour > 20;
+    const isDawnDusk = (hour >= 6 && hour < 8) || (hour >= 18 && hour <= 20);
+    
+    let waterColor = '#234b6e'; // Default Day (Steel Blue)
+    if (isNight) waterColor = '#050a15'; // Deep Night
+    if (isDawnDusk) waterColor = '#1a3350'; // Transition
+    
+    map.setPaintProperty('water', 'fill-color', waterColor);
+  }
   
   // Update sky color
   document.body.style.setProperty('--sky-color', getSkyColor(hour));
@@ -160,61 +234,71 @@ function updateSunPosition(hour) {
 
 function getSunColor(hour) {
   if (hour < 6 || hour > 20) return '#a5b4fc'; // Night - moonlight blue
-  if (hour < 8) return '#ffa07a'; // Dawn - orange
+  if (hour < 8) return '#d4dfff'; // Dawn - cool white
   if (hour < 18) return '#ffffff'; // Day - white
-  return '#ff8c00'; // Dusk - sunset orange
+  return '#d4dfff'; // Dusk - cool white
 }
 
 function getSkyColor(hour) {
   if (hour < 6 || hour > 20) return '#0a0a1a';
-  if (hour < 8) return '#ff9a56';
+  if (hour < 8) return '#2c3e50'; // Dawn - dark steel
   if (hour < 18) return '#87ceeb';
-  return '#ff6b6b';
+  return '#2c3e50'; // Dusk - dark steel
 }
 
 // ============================================
 // 2. PROPERTY VIEWER (HM Land Registry)
 // ============================================
-let propertyPopup = null;
-
 function initPropertyViewer() {
-  propertyPopup = new maplibregl.Popup({
-    closeButton: true,
-    closeOnClick: false,
-    maxWidth: '320px'
-  });
-  
   map.on('click', async (e) => {
     // Check if property viewer is enabled
     if (!document.getElementById('toggle-property')?.checked) return;
     
     const { lng, lat } = e.lngLat;
     
-    // Show loading
-    propertyPopup
+    // Close any existing popup
+    if (activePopup) activePopup.remove();
+
+    // Show loading popup
+    activePopup = new maplibregl.Popup({
+      closeButton: true,
+      closeOnClick: false,
+      maxWidth: '320px'
+    })
       .setLngLat([lng, lat])
       .setHTML('<div class="popup-loading">🔍 Searching sales data...</div>')
       .addTo(map);
     
+    // Add event listener to nullify on close
+    activePopup.on('close', () => { activePopup = null; });
+
     try {
       // Step 1: Get postcode from coordinates
       const postcodeRes = await fetch(`https://api.postcodes.io/postcodes?lon=${lng}&lat=${lat}&limit=1`);
       const postcodeData = await postcodeRes.json();
       
       if (!postcodeData.result || postcodeData.result.length === 0) {
-        propertyPopup.setHTML('<div class="popup-error">❌ No postcode found for this location</div>');
+        activePopup.setHTML('<div class="popup-error">❌ No postcode found for this location</div>');
         return;
       }
       
       const postcode = postcodeData.result[0].postcode;
+      const lsoa = postcodeData.result[0].lsoa || postcodeData.result[0].codes?.lsoa;
+      const adminDistrict = postcodeData.result[0].admin_district;
       
       // Step 2: Query Land Registry
       const sales = await fetchLandRegistryData(postcode);
       
       if (sales.length === 0) {
-        propertyPopup.setHTML(`<div class="popup-content">
+        activePopup.setHTML(`<div class="popup-content">
           <h3>📍 ${postcode}</h3>
           <p>No recent sales found in this area.</p>
+          <div class="popup-section">
+            <h4>📊 Demographics (Census 2021)</h4>
+            <p><strong>District:</strong> ${adminDistrict}</p>
+            <p><strong>Census Area:</strong> ${lsoa || 'N/A'}</p>
+            ${lsoa ? `<a href="https://www.nomisweb.co.uk/reports/localarea?compare=${lsoa}" target="_blank" class="census-link">📊 View 2021 Census Profile</a>` : ''}
+          </div>
         </div>`);
         return;
       }
@@ -228,18 +312,24 @@ function initPropertyViewer() {
         </div>
       `).join('');
       
-      propertyPopup.setHTML(`
+      activePopup.setHTML(`
         <div class="popup-content">
           <h3>📍 ${postcode}</h3>
           <p class="popup-subtitle">Recent Property Sales</p>
           ${salesHtml}
-          <p class="popup-source">Source: HM Land Registry</p>
+          <div class="popup-section">
+            <h4>📊 Demographics (Census 2021)</h4>
+            <p><strong>District:</strong> ${adminDistrict}</p>
+            <p><strong>Census Area:</strong> ${lsoa || 'N/A'}</p>
+            ${lsoa ? `<a href="https://www.nomisweb.co.uk/reports/localarea?compare=${lsoa}" target="_blank" class="census-link">📊 View 2021 Census Profile</a>` : ''}
+          </div>
+          <p class="popup-source">Source: HM Land Registry & ONS</p>
         </div>
       `);
       
     } catch (err) {
       console.error('Property lookup error:', err);
-      propertyPopup.setHTML('<div class="popup-error">❌ Error fetching data</div>');
+      activePopup.setHTML('<div class="popup-error">❌ Error fetching data</div>');
     }
   });
   
@@ -293,7 +383,9 @@ function initCrimeHeatmap() {
   toggle.addEventListener('change', async (e) => {
     if (e.target.checked) {
       await loadCrimeData();
+      map.on('moveend', loadCrimeData);
     } else {
+      map.off('moveend', loadCrimeData);
       if (map.getLayer('crime-heat')) {
         map.setLayoutProperty('crime-heat', 'visibility', 'none');
       }
@@ -305,10 +397,12 @@ function initCrimeHeatmap() {
 
 async function loadCrimeData() {
   const center = map.getCenter();
+  showToast('crime');
   
   try {
     const res = await fetch(`https://data.police.uk/api/crimes-street/all-crime?lat=${center.lat}&lng=${center.lng}`);
     const crimes = await res.json();
+    hideToast('crime');
     
     // Convert to GeoJSON
     const geojson = {
@@ -356,6 +450,7 @@ async function loadCrimeData() {
     
   } catch (err) {
     console.error('Crime data fetch failed:', err);
+    hideToast('crime');
   }
 }
 
@@ -380,10 +475,13 @@ function initAirQuality() {
 }
 
 async function loadAirQualityData() {
+  showToast('air');
   try {
     // Use London Air API to get sensor data
     const res = await fetch('https://api.erg.ic.ac.uk/AirQuality/Hourly/MonitoringIndex/GroupName=London/Json');
     const data = await res.json();
+    
+    hideToast('air');
     
     // Parse sensor locations and values
     const features = [];
@@ -447,8 +545,139 @@ async function loadAirQualityData() {
     
   } catch (err) {
     console.error('Air quality fetch failed:', err);
+    hideToast('air');
   }
 }
 
 // Error handling
+// ============================================
+// 5. FLOOD RISK (Environment Agency)
+// ============================================
+// ============================================
+// 6. TRANSPORT LAYER (TfL StopPoints)
+// ============================================
+let transportMarkers = [];
+let loadedStationIds = new Set(); // Track loaded stations
+
+const TFL_COLORS = {
+  'bakerloo': '#B36305',
+  'central': '#E32017',
+  'circle': '#FFD300',
+  'district': '#00782A',
+  'hammersmith-city': '#F3A9BB',
+  'jubilee': '#A0A5A9',
+  'metropolitan': '#9B0056',
+  'northern': '#000000',
+  'piccadilly': '#003688',
+  'victoria': '#0098D4',
+  'waterloo-city': '#95CDBA',
+  'london-overground': '#EF7B10',
+  'elizabeth': '#6950a1',
+  'dlr': '#00AFAD',
+  'tram': '#00BD19'
+};
+
+function initTransport() {
+  const toggle = document.getElementById('toggle-transport');
+  if (!toggle) return;
+
+  toggle.addEventListener('change', async (e) => {
+    if (e.target.checked) {
+      // Load initial
+      await updateTransportMarkers();
+      // Add dynamic listener
+      map.on('moveend', updateTransportMarkers);
+    } else {
+      // Cleanup
+      map.off('moveend', updateTransportMarkers);
+      transportMarkers.forEach(m => m.remove());
+      transportMarkers = [];
+      loadedStationIds.clear();
+    }
+  }); 
+  console.log('🚇 Transport layer initialized (Interactive Markers)');
+}
+
+async function updateTransportMarkers() {
+  // Only update if enabled
+  if (!document.getElementById('toggle-transport').checked) return;
+
+  const center = map.getCenter();
+  showToast('transport');
+
+  try {
+    const res = await fetch(`https://api.tfl.gov.uk/StopPoint?lat=${center.lat}&lon=${center.lng}&stopTypes=NaptanMetroStation,NaptanRailStation&radius=3000`);
+    const data = await res.json();
+    
+    hideToast('transport');
+
+    if (!data.stopPoints) return;
+
+    data.stopPoints.forEach(station => {
+      // 1. Deduplication Check
+      if (loadedStationIds.has(station.naptanId)) return;
+      loadedStationIds.add(station.naptanId);
+
+      // 2. Calculate Gradient/Color
+      const stationLines = station.lines.map(l => l.id);
+      const uniqueColors = [...new Set(stationLines.map(id => TFL_COLORS[id] || '#666'))];
+      
+      let backgroundStyle;
+      if (uniqueColors.length === 0) {
+        backgroundStyle = '#666';
+      } else if (uniqueColors.length === 1) {
+        backgroundStyle = uniqueColors[0];
+      } else {
+        const segmentSize = 100 / uniqueColors.length;
+        const gradientParts = uniqueColors.map((color, i) => {
+          return `${color} ${i * segmentSize}% ${(i + 1) * segmentSize}%`;
+        });
+        backgroundStyle = `conic-gradient(${gradientParts.join(', ')})`;
+      }
+
+      // 3. Create DOM Element
+      const el = document.createElement('div');
+      el.className = 'transport-marker';
+      el.style.background = backgroundStyle;
+      
+      // 4. Click Event
+      el.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent Property Viewer
+        
+        const lineNames = station.lines.map(l => l.name).join(', ');
+        const zones = station.additionalProperties.find(p => p.key === 'Zone')?.value || 'N/A';
+        
+        // Close others
+        if (activePopup) activePopup.remove();
+        
+        activePopup = new maplibregl.Popup({ offset: 15 })
+          .setLngLat([station.lon, station.lat])
+          .setHTML(`
+            <div class="popup-content">
+              <h3>🚇 ${station.commonName}</h3>
+              <p><strong>Lines:</strong> ${lineNames}</p>
+              <p><strong>Zone:</strong> ${zones}</p>
+            </div>
+          `)
+          .addTo(map);
+          
+        activePopup.on('close', () => { activePopup = null; });
+      });
+
+      // 5. Add Marker
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([station.lon, station.lat])
+        .addTo(map);
+        
+      transportMarkers.push(marker);
+    });
+    
+    console.log(`🚇 Updated stations: Total ${transportMarkers.length}`);
+
+  } catch (err) {
+    console.error('Transport data error:', err);
+    hideToast('transport');
+  }
+}
+
 map.on('error', (e) => console.error('Map error:', e.error));

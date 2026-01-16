@@ -8,12 +8,18 @@ An interactive 3D visualization of London built with WebGL. Explore the city's a
 
 | Feature | Description | Data Source |
 |---------|-------------|-------------|
-| ☀️ **Sunlight Analyzer** | Simulate sun position throughout the day | `suncalc` library |
-| 🏠 **Property Viewer** | Click anywhere to see recent sold prices | HM Land Registry (SPARQL API) |
+| ☀️ **Sunlight Analyzer** | Simulate sun position or sync to **Real-time** | `suncalc` library |
+| 🏠 **Property Viewer** | Sold prices + **Census 2021 Demographics** | Land Registry & ONS |
 | 🚨 **Crime Heatmap** | Toggle crime density visualization | data.police.uk API |
 | 🌫️ **Air Quality** | Real-time pollution levels | London Air Quality Network |
+| 🚇 **Transport** | Tube stations with live status & zones | TfL Unified API |
 
 All data sources are **free and open** — no API keys required.
+
+### 🎨 UX Enhancements
+- **Multi-color Markers**: Transport stations show accurate line colors (e.g., conic gradients for interchanges).
+- **Concurrent Loading Toast**: Smart notification system that tracks multiple background data fetches.
+- **Dynamic Water**: River colors shift from steel blue (day) to deep navy (night).
 
 ---
 
