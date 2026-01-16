@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Interactive 3D map of London with sunlight analysis, property prices, crime stats, and air quality">
+    <title>London 3D Map</title>
+    <script type="module" crossorigin src="./assets/index-DInD8nBB.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BKTKn_no.css">
+  </head>
+  <body>
+    <div id="map"></div>
+    
+    <!-- Loading Overlay -->
+    <div id="loading">
+      <div class="spinner"></div>
+      <p>Loading London...</p>
+    </div>
+    
+    <!-- Control Panel -->
+    <div id="control-panel">
+      <h1>🏙️ London 3D</h1>
+      
+      <!-- Sunlight Analyzer -->
+      <div class="control-section">
+        <h2>☀️ Sunlight</h2>
+        <div class="slider-container">
+          <input type="range" id="time-slider" min="5" max="21" step="0.25" value="12">
+          <span id="time-display">12:00</span>
+          <label class="realtime-label" style="display: flex; align-items: center; gap: 4px; font-size: 0.9em; opacity: 0.8;">
+            <input type="checkbox" id="toggle-realtime"> Now
+          </label>
+        </div>
+      </div>
+      
+      <!-- Data Layers -->
+      <div class="control-section">
+        <h2>📊 Data Layers</h2>
+        
+        <label class="toggle-row">
+          <input type="checkbox" id="toggle-property" checked>
+          <span class="toggle-label">🏠 Property Sales</span>
+        </label>
+        
+        <label class="toggle-row">
+          <input type="checkbox" id="toggle-crime">
+          <span class="toggle-label">🚨 Crime</span>
+        </label>
+        
+        <label class="toggle-row">
+          <input type="checkbox" id="toggle-airquality">
+          <span class="toggle-label">🌫️ Air Quality</span>
+        </label>
+        
+        <label class="toggle-row">
+          <input type="checkbox" id="toggle-transport">
+          <span class="toggle-label">🚇 Tube Stations</span>
+        </label>
+      </div>
+      
+      <!-- Instructions -->
+      <div class="control-section hint">
+        <p>🖱️ Click map for property prices</p>
+        <p>🔄 Right-drag to rotate</p>
+      </div>
+    </div>
+    
+    <div id="loading-toast" class="loading-toast hidden">Loading...</div>
+  </body>
+</html>
