@@ -303,14 +303,41 @@ function initPropertyViewer() {
         return;
       }
       
+      const TYPE_MAP = {
+        'detached': '🏡 Detached',
+        'semi-detached': '🏡 Semi-Detached',
+        'terraced': '🏘️ Terraced',
+        'flat-maisonette': '🏢 Flat',
+        'otherpropertytype': '📦 Other',
+        'other': '📦 Other'
+      };
+      
+      const TENURE_MAP = {
+        'freehold': '🆓 Freehold',
+        'leasehold': '⏳ Leasehold'
+      };
+
       // Step 3: Display results
-      const salesHtml = sales.slice(0, 5).map(sale => `
+      const salesHtml = sales.slice(0, 5).map(sale => {
+        const typeKey = (sale.type || '').toLowerCase();
+        const tenureKey = (sale.tenure || '').toLowerCase();
+
+        return `
         <div class="sale-item">
-          <span class="sale-address">${sale.address}</span>
-          <span class="sale-price">£${Number(sale.price).toLocaleString()}</span>
-          <span class="sale-date">${new Date(sale.date).toLocaleDateString('en-GB')}</span>
+          <div class="sale-header">
+             <span class="sale-price">£${Number(sale.price).toLocaleString()}</span>
+             <span class="sale-date">${new Date(sale.date).toLocaleDateString('en-GB')}</span>
+          </div>
+          <div class="sale-address">
+            ${sale.address}
+          </div>
+          <div class="sale-meta">
+            <span class="badge">${TYPE_MAP[typeKey] || sale.type}</span>
+            <span class="badge">${TENURE_MAP[tenureKey] || sale.tenure}</span>
+            ${sale.newBuild ? '<span class="badge new-build">✨ New Build</span>' : ''}
+          </div>
         </div>
-      `).join('');
+      `}).join('');
       
       activePopup.setHTML(`
         <div class="popup-content">
@@ -336,15 +363,25 @@ function initPropertyViewer() {
   console.log('🏠 Property viewer initialized');
 }
 
+/**
+ * Queries HM Land Registry (SPARQL endpoint) for property sales.
+ * @param {string} postcode - The postcode to search for.
+ * @returns {Promise<Array>} List of sales with price, date, address, type, tenure.
+ */
 async function fetchLandRegistryData(postcode) {
+  // SPARQL Query: Fetches Price Paid Data linked to the postcode
+  // Includes optional fields for formatted address and property attributes
   const sparqlQuery = `
     PREFIX ppi: <http://landregistry.data.gov.uk/def/ppi/>
     PREFIX common: <http://landregistry.data.gov.uk/def/common/>
     
-    SELECT ?amount ?date ?paon ?saon ?street WHERE {
+    SELECT ?amount ?date ?paon ?saon ?street ?propertyType ?newBuild ?estateType WHERE {
       ?tx ppi:pricePaid ?amount ;
           ppi:transactionDate ?date ;
-          ppi:propertyAddress ?addr .
+          ppi:propertyAddress ?addr ;
+          ppi:propertyType ?propertyType ;
+          ppi:newBuild ?newBuild ;
+          ppi:estateType ?estateType .
       ?addr common:postcode "${postcode}" ;
             common:street ?street .
       OPTIONAL { ?addr common:paon ?paon }
@@ -363,7 +400,10 @@ async function fetchLandRegistryData(postcode) {
     return data.results.bindings.map(b => ({
       price: b.amount?.value || 0,
       date: b.date?.value || '',
-      address: [b.saon?.value, b.paon?.value, b.street?.value].filter(Boolean).join(', ')
+      address: [b.saon?.value, b.paon?.value, b.street?.value].filter(Boolean).join(', '),
+      type: b.propertyType?.value.split('/').pop(),
+      newBuild: b.newBuild?.value === 'true',
+      tenure: b.estateType?.value.split('/').pop()
     }));
   } catch (err) {
     console.error('SPARQL query failed:', err);
@@ -549,9 +589,8 @@ async function loadAirQualityData() {
   }
 }
 
-// Error handling
 // ============================================
-// 5. FLOOD RISK (Environment Agency)
+// 5. ERROR HANDLING & UTILS
 // ============================================
 // ============================================
 // 6. TRANSPORT LAYER (TfL StopPoints)
@@ -619,6 +658,8 @@ async function updateTransportMarkers() {
       loadedStationIds.add(station.naptanId);
 
       // 2. Calculate Gradient/Color
+      // Tube stations often serve multiple lines. We generate a conic gradient
+      // to represent all serving lines on a single marker.
       const stationLines = station.lines.map(l => l.id);
       const uniqueColors = [...new Set(stationLines.map(id => TFL_COLORS[id] || '#666'))];
       
@@ -628,6 +669,7 @@ async function updateTransportMarkers() {
       } else if (uniqueColors.length === 1) {
         backgroundStyle = uniqueColors[0];
       } else {
+        // Create equal segments for each line color
         const segmentSize = 100 / uniqueColors.length;
         const gradientParts = uniqueColors.map((color, i) => {
           return `${color} ${i * segmentSize}% ${(i + 1) * segmentSize}%`;
