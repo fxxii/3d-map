@@ -1,8 +1,19 @@
 # 🏙️ 3D Map
 
-An interactive 3D visualization of London built with WebGL. Explore the city's architecture with smooth pan, rotate, and zoom controls.
+An interactive 3D visualization of London built with WebGL. Explore the city's architecture with smooth pan, rotate, and zoom controls — plus real-time data layers for property prices, crime stats, and air quality.
 
 ![3D Map Preview](./preview.png)
+
+## ✨ Features
+
+| Feature | Description | Data Source |
+|---------|-------------|-------------|
+| ☀️ **Sunlight Analyzer** | Simulate sun position throughout the day | `suncalc` library |
+| 🏠 **Property Viewer** | Click anywhere to see recent sold prices | HM Land Registry (SPARQL API) |
+| 🚨 **Crime Heatmap** | Toggle crime density visualization | data.police.uk API |
+| 🌫️ **Air Quality** | Real-time pollution levels | London Air Quality Network |
+
+All data sources are **free and open** — no API keys required.
 
 ---
 

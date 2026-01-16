@@ -12,6 +12,7 @@
     "vite": "^7.2.4"
   },
   "dependencies": {
-    "maplibre-gl": "^5.16.0"
+    "maplibre-gl": "^5.16.0",
+    "suncalc": "^1.9.0"
   }
 }
