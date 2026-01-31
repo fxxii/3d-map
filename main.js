@@ -5,9 +5,9 @@ import SunCalc from 'suncalc';
 // ============================================
 // CONFIGURATION
 // ============================================
-const LONDON_CENTER = [-0.1279, 51.5076];
-const LONDON_LAT = 51.5076;
-const LONDON_LON = -0.1279;
+const LONDON_CENTER = [-0.1175, 51.505];
+const LONDON_LAT = 51.508;
+const LONDON_LON = -0.116;
 
 // ============================================
 // GLOBAL STATE
@@ -50,11 +50,11 @@ const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/liberty',
   center: LONDON_CENTER,
-  zoom: 15.5,
-  pitch: 60,
-  bearing: -17.6,
+  zoom: 16.5,
+  pitch: 70, // Slightly more "up" angle (less flat)
+  bearing: 60, // Face East-North-East towards Liverpool Street
   antialias: true,
-  maxPitch: 70,
+  maxPitch: 85, // Allow flatter angles
   minZoom: 10,
   maxZoom: 19
 });
